@@ -43,6 +43,9 @@ def check_proxy(proxy_queue, timeout, working_proxies, check_results):
 
     # Url for proxy testing.
     proxy_test_url = 'https://pgorelease.nianticlabs.com/plfe/rpc'
+    proxy_test_url_ptc = 'https://sso.pokemon.com/sso/login'
+    banned_status_codes = [403, 409]
+
     proxy = proxy_queue.get()
 
     check_result = check_result_ok
@@ -60,17 +63,29 @@ def check_proxy(proxy_queue, timeout, working_proxies, check_results):
                                            timeout=timeout,
                                            verify=False)
 
-            if proxy_response.status_code == 200:
+            proxy_response_ptc = requests.post(proxy_test_url_ptc, '',
+                                           proxies={
+                                               'http': proxy[1],
+                                               'https': proxy[1]
+                                           },
+                                           timeout=timeout,
+                                           verify=False)
+
+            if ((proxy_response.status_code == 200)
+                and (proxy_response_ptc.status_code == 200)):
                 log.debug('Proxy %s is ok.', proxy[1])
                 proxy_queue.task_done()
                 working_proxies.append(proxy[1])
                 check_results[check_result_ok] += 1
                 return True
 
-            elif proxy_response.status_code == 403:
+            elif ((proxy_response.status_code in banned_status_codes)
+                or (proxy_response_ptc.status_code in banned_status_codes)):
                 proxy_error = ("Proxy " + proxy[1] +
-                               " is banned - got status code: " +
-                               str(proxy_response.status_code))
+                               " is banned - got pogo status code: " +
+                               str(proxy_response.status_code) + 
+                               " and ptc status code " + 
+                               str(proxy_response_ptc.status_code))
                 check_result = check_result_banned
 
             else:
